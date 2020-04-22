@@ -370,8 +370,14 @@ summary {
 
 
 <pre class="r"><code>library(tidyverse)
-ncaa &lt;- read_csv(&quot;cbb.csv&quot;)</code></pre>
+ncaa_old &lt;- read_csv(&quot;cbb.csv&quot;)</code></pre>
 <p>I’ve imported a dataset with stats from the 2015, 2016, 2017, 2018, and 2019 NCAA Men’s DI basketball seasons. I want to find out if we can predict whether or not a team will make the NCAA post-season tournament from the other variables in the dataset.</p>
+<pre class="r"><code>ncaa &lt;- ncaa_old %&gt;%
+  mutate(tournament = ifelse(ncaa_old$POSTSEASON %in% 
+                  c('2ND', 'Champions', 'E8', 'F4', 'R64', 'R32', 'S16'), 1, 0))
+ncaa$POSTSEASON = NULL
+ncaa$SEED = NULL</code></pre>
+<p>I updated the dataset to create a column of dummy variables for whether or not a team made the tournament. Previously, <code>POSTSEASON</code> had data on which round the team was eliminated in the tournament, but I am only concerned about if they made the tournament. I then deleted the old <code>POSTSEASON</code> column. I also deleted <code>SEED</code> (a team’s ranking in the tournament) because again I am only concerned about whether or not they made the tournament.</p>
 
 
 
