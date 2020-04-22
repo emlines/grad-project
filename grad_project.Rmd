@@ -1,30 +1,20 @@
 ---
-title: "grad_project"
+title: "Grad Project"
 author: "Emily Lines"
 date: "4/20/2020"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r load data, warning = FALSE, message = FALSE}
+
+library(tidyverse)
+ncaa <- read_csv("cbb.csv")
+
 ```
 
-## R Markdown
+I've imported a dataset with stats from the 2015, 2016, 2017, 2018, and 2019 NCAA Men's DI basketball seasons. I want to find out if we can predict whether or not a team will make the NCAA post-season tournament from the other variables in the dataset. 
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
-```{r cars}
-summary(cars)
-```
 
-## Including Plots
 
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
