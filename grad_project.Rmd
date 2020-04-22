@@ -2,12 +2,24 @@
 title: "Grad Project"
 author: "Emily Lines"
 date: "4/20/2020"
-output: html_document
+output: 
+  html_document: 
+    theme: cosmo
 ---
+
+### Research Question
+
+Can we predict whether or not a team will make the NCAA basketball tournament by their stats from the season?
 
 ```{r load data, warning = FALSE, message = FALSE}
 
 library(tidyverse)
+library(tidymodels)
+library(ISLR)
+library(dplyr)
+install.packages("ranger")
+install.packages("xgboost")
+
 ncaa_old <- read_csv("cbb.csv")
 
 ```
@@ -21,19 +33,96 @@ ncaa <- ncaa_old %>%
                   c('2ND', 'Champions', 'E8', 'F4', 'R64', 'R32', 'S16'), 1, 0))
 ncaa$POSTSEASON = NULL
 ncaa$SEED = NULL
+ncaa$`3P_D` = NULL
+ncaa$`3P_O` = NULL
+ncaa$`2P_D` = NULL
+ncaa$`2P_O` = NULL
 
+  
 ```
 
 I updated the dataset to create a column of dummy variables for whether or not a team made the tournament. Previously, `POSTSEASON` had data on which round the team was eliminated in the tournament, but I am only concerned about if they made the tournament. I then deleted the old `POSTSEASON` column. I also deleted `SEED` (a team's ranking in the tournament) because again I am only concerned about whether or not they made the tournament. 
 
+### Fitting a Model
+
+```{r split data}
+set.seed(11)
+ncaa_cv <- vfold_cv(ncaa, v = 5)
+```
+
+We perform cross validation on the data set.
+
+```{r rf model}
+set.seed(11)
+
+bagging_spec <- rand_forest(
+  mode = "regression",
+  mtry = 3,
+  trees = tune()
+) %>%
+  set_engine("ranger")
+
+grid <- expand.grid(trees =c(100,200,300,400,500))
+bagging_model <- tune_grid(bagging_spec,
+             tournament ~ G + W + ADJOE + ADJDE + BARTHAG + EFG_O + EFG_D + TOR + TORD + ORB + DRB + FTR + FTRD + ADJ_T + WAB,
+             resamples = ncaa_cv,
+             grid = grid
+            )
+```
+
+We create a random forest specification for our model.
+
+```{r fit model}
+final_model <- bagging_model %>%
+  collect_metrics() %>%
+  filter(.metric == "rmse") %>%
+  arrange(mean)
+final_model
+
+```
+
+When we fit the model on the data, we see that 400 trees gives us the smallest RMSE. 
+
+To see if we can get a better RMSE, we can try a boosted model. 
+
+```{r boost model}
+set.seed(11)
+boost_spec <- boost_tree(
+  mode = "regression",
+  tree_depth = 1,
+  trees = tune(),
+  learn_rate = 0.1
+) %>%
+  set_engine("xgboost")
+
+grid <- expand.grid(trees =c(100,200,300,400,500))
+boost_model <- tune_grid(boost_spec,
+             tournament ~ G + W + ADJOE + ADJDE + BARTHAG + EFG_O + EFG_D + TOR              + TORD + ORB + DRB + FTR + FTRD + ADJ_T + WAB,
+             resamples = ncaa_cv,
+             grid = grid,
+            )
 
 
+```
+
+We create a boosted tree specification and fit the model.
+
+```{r collect metrics boost}
+set.seed(11)
+boost_model_final <- boost_model %>%
+  collect_metrics() %>%
+  filter(.metric == "rmse") %>%
+  arrange(mean)
+boost_model_final
+
+```
+
+We can see that 100 trees gives us the lowest RMSE, but it is still not as efficient as the bagged tree model. 
 
 
+### Evaluation of Model
 
-
-
-
+We can see that a Random Forest model with 400 trees gives us the smallest RMSE for the data. But, considering we were trying to predict a 1 or a 0 from the data, a root mean squared error of .237 is still not very good. 
 
 
 
