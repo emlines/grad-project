@@ -125,5 +125,8 @@ We can see that 100 trees gives us the lowest RMSE, but it is still not as effic
 We can see that a Random Forest model with 400 trees gives us the smallest RMSE for the data. But, considering we were trying to predict a 1 or a 0 from the data, a root mean squared error of .237 is still not very good. 
 
 
+I wanted to predict whether or not a basketball team would make the NCAA tournament based off of their stats from the season. I decided to use a tree-based method because of the simplicity of the interpretation of the model. I first created a random forest model and a boosted tree model, but the random forest had a smaller RMSE, so I chose to use this model with 400 trees. Even though this model had the smallest RMSE of .237, this still was high considering we were only dealing with 1s and 0s. So, I would conclude that we cannot very accurately predict whether or not a team would make the NCAA tournament based on this model. 
+
+
 
 
