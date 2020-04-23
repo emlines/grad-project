@@ -2,9 +2,10 @@
 title: "Grad Project"
 author: "Emily Lines"
 date: "4/20/2020"
-output: 
-  html_document: 
+output:
+  html_document:
     theme: cosmo
+  pdf_document: default
 ---
 
 ### Prediction Question
@@ -28,8 +29,8 @@ ncaa_old <- read_csv("cbb.csv")
 ncaa <- ncaa_old %>%
   mutate(tournament = ifelse(ncaa_old$POSTSEASON %in% 
                   c('2ND', 'Champions', 'E8', 'F4', 'R64', 'R32', 'S16'), 1, 0))
-ncaa$POSTSEASON = NULL
-ncaa$SEED = NULL
+#ncaa$POSTSEASON = NULL
+#ncaa$SEED = NULL
 
 ```
 
@@ -125,7 +126,7 @@ model2 %>%
 
 We can see that our random forest model also performed well. 94.3% of teams were accurately predicted for not making the tournament and 79.8% of teams were accurately predicted for making the tournament. Overall we had 92.3% accuracy.
 
-
+Now, we check the boosted tree model.
 
 ```{r boosted}
 set.seed(77)
@@ -147,6 +148,16 @@ model3 %>%
   conf_mat(truth = tournament, estimate = .pred_class) %>%
   autoplot(type = "heatmap")
 ```
+
+For the boosted tree, we see that for not making the tournament, we were 93.5% accurate and for making the tournament we were 82.3% accurate. Overall we had 92.1% accuracy.
+
+
+### Evaluating the Model
+
+Overall, we can see that the normal classification tree performed better than the random forest or boosted tree models. So, we choose this model and conclude that we are able to predict whether or not a team will make the NCAA tournament with 94.5% accuracy. 
+
+Now, we can plot our decision tree. 
+
 
 ```{r plot packages}
 install.packages("rpart.plot")
@@ -178,8 +189,9 @@ rpart.plot(final_model$fit,
 ```
 
 
+In conclusion, we were able to predict whether or not a team was able to make the NCAA tournament with 94% accuracy. In order to get this result, I decided to use decision trees. I thought this would be the best method because of the simplicity of the interpretation of the models, especially with classification. I first did a regular classification decision tree, then decided to create a random forest model and boosted tree model to try to get better accuracy. But, it turns out that the original model performed the best. 
 
-
+The result we obtained for this model could be very interesting when applied to 2020, this past basketball season. Since the NCAA tournament had to be cancelled due to the coronavirus, we will never know who would have actually made the tournament. But this model could be a fairly accurate way to predict who might have!
 
 
 
