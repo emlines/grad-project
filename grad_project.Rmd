@@ -7,6 +7,13 @@ output:
     theme: cosmo
 ---
 
+### Prediction Question
+
+Can we predict whether or not a DI men's basketball team will make the NCAA tournament based off of the team's stats from that year?
+
+### Fitting the Model
+
+
 ```{r install}
 install.packages("ranger")
 ```
@@ -26,18 +33,24 @@ ncaa$SEED = NULL
 
 ```
 
+Here we load the dataset, (from Kaggle https://www.kaggle.com/andrewsundberg/college-basketball-dataset), which is DI men's basketball team stats from 2015-2019. There are 24 variables and 1757 observations. In the `POSTSEASON` column, it lists which round of the tournament the team was eliminated in, but we are only interested in whether or not the team made the tournament, so I changed that to a dummy variable with 1 representing the team making the tournament. I also deleted the column that had data on which seed the team was in the tournament because we are not interested in this.
+
+
 ```{r fix columns}
 names(ncaa) <- c("team", "conference", "games", "wins", "adjoe", "adjde", "pwrrating", "efg_o", "efg_d", "tor", "tord", "orb", "drb", "ftr","ftrd", "fg_o", "fg_d", "threep_o", "threep_d", "adj_t", "wab", "year", "tournament")
 ```
+
+I changed the column names to make the dataset easier to work with.
 
 ```{r fix variable types}
 ncaa$conference <- factor(ncaa$conference)
 ncaa$year <- factor(ncaa$year)
 ncaa$tournament <- factor(ncaa$tournament)
 levels(ncaa$tournament) <- c("no", "yes")
-ncaa
 
 ```
+
+Here I changed the categorical variables into factors. 
 
 ```{r cv and spec}
 ncaa_cv <- vfold_cv(ncaa, v = 5)
@@ -55,6 +68,9 @@ model <- tune_grid(tree_spec,
                    resamples = ncaa_cv,
                    metrics = metric_set(gain_capture, accuracy))
 ```
+
+Now we perform cross validation on our dataset and fit a decision tree. We tune the cost complexity of the tree. 
+
 
 ```{r class tree}
 best <- model %>%
@@ -80,9 +96,11 @@ final_model %>%
 
 ```
 
+We pull out the best metric for cost complexity and use it to fit our final model. We can see that our model performed well: 95.7% of teams were correctly picked for not making the tournament and 88.9% of teams were correctly picked for making the tournament. Overall, 94.5% accuracy. 
 
+To see if we can get better accuracy, let's try a random forest model.
 
-```{r bagged split}
+```{r rf split}
 set.seed(77)
 ncaa_split <- initial_split(ncaa, prop = 0.5)
 ncaa_train <- training(ncaa_split)
@@ -104,6 +122,9 @@ model2 %>%
   autoplot(type = "heatmap")
 
 ```
+
+We can see that our random forest model also performed well. 94.3% of teams were accurately predicted for not making the tournament and 79.8% of teams were accurately predicted for making the tournament. Overall we had 92.3% accuracy.
+
 
 
 ```{r boosted}
@@ -147,8 +168,9 @@ final_spec <- decision_tree(
   set_engine("rpart")
 
 final_model <- fit(final_spec,
-                   tournament ~ conference + games + wins + adjoe ,
+                   tournament ~ conference + games + wins + adjoe + pwrrating + efg_o + efg_d + tor + tord + orb +drb + ftr + ftrd + fg_o + fg_d + threep_o + threep_d + adj_t + wab + year,
                    data = ncaa)
+
 
 rpart.plot(final_model$fit,
            roundint = FALSE)
