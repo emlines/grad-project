@@ -7,125 +7,125 @@ output:
     theme: cosmo
 ---
 
-### Research Question
-
-Can we predict whether or not a team will make the NCAA basketball tournament by their stats from the season?
-
-```{r load data, warning = FALSE, message = FALSE}
-
-library(tidyverse)
-library(tidymodels)
-library(ISLR)
-library(dplyr)
+```{r install}
 install.packages("ranger")
-install.packages("xgboost")
-
-ncaa_old <- read_csv("cbb.csv")
-
 ```
 
-I've imported a dataset with stats from the 2015, 2016, 2017, 2018, and 2019 NCAA Men's DI basketball seasons. I want to find out if we can predict whether or not a team will make the NCAA post-season tournament from the other variables in the dataset. 
 
-```{r update data}
+```{r load data and packages, warning = FASE, message = FALSE}
+library(tidymodels)
+library(tidyverse)
+library(rpart)
 
+ncaa_old <- read_csv("cbb.csv")
 ncaa <- ncaa_old %>%
   mutate(tournament = ifelse(ncaa_old$POSTSEASON %in% 
                   c('2ND', 'Champions', 'E8', 'F4', 'R64', 'R32', 'S16'), 1, 0))
 ncaa$POSTSEASON = NULL
 ncaa$SEED = NULL
-ncaa$`3P_D` = NULL
-ncaa$`3P_O` = NULL
-ncaa$`2P_D` = NULL
-ncaa$`2P_O` = NULL
 
-  
 ```
 
-I updated the dataset to create a column of dummy variables for whether or not a team made the tournament. Previously, `POSTSEASON` had data on which round the team was eliminated in the tournament, but I am only concerned about if they made the tournament. I then deleted the old `POSTSEASON` column. I also deleted `SEED` (a team's ranking in the tournament) because again I am only concerned about whether or not they made the tournament. 
+```{r fix columns}
+names(ncaa) <- c("team", "conference", "games", "wins", "adjoe", "adjde", "pwrrating", "efg_o", "efg_d", "tor", "tord", "orb", "drb", "ftr","ftrd", "fg_o", "fg_d", "threep_o", "threep_d", "adj_t", "wab", "year", "tournament")
+```
 
-### Fitting a Model
+```{r fix variable types}
+ncaa$conference <- factor(ncaa$conference)
+ncaa$year <- factor(ncaa$year)
+ncaa$tournament <- factor(ncaa$tournament)
+levels(ncaa$tournament) <- c("no", "yes")
+ncaa
 
-```{r split data}
-set.seed(11)
+```
+
+```{r cv and spec}
 ncaa_cv <- vfold_cv(ncaa, v = 5)
+
+tree_spec <- decision_tree(
+  cost_complexity = tune(),
+  tree_depth = 10,
+  mode = "classification") %>%
+  set_engine("rpart")
+
+grid <- expand_grid(cost_complexity = seq(0.01, 0.05, by = 0.01))
+model <- tune_grid(tree_spec,
+                   tournament ~ conference + games + wins + adjoe + adjde + pwrrating + efg_o + efg_d + tor + tord + orb +drb + ftr + ftrd + fg_o + fg_d + threep_o + threep_d + adj_t + wab + year,
+                   grid = grid,
+                   resamples = ncaa_cv,
+                   metrics = metric_set(gain_capture, accuracy))
 ```
 
-We perform cross validation on the data set.
+```{r class tree}
+best <- model %>%
+  select_best(metric = "gain_capture") %>%
+  pull()
 
-```{r rf model}
-set.seed(11)
+final_spec <- decision_tree(
+  cost_complexity = best,
+  tree_depth = 10,
+  mode = "classification"
+) %>%
+  set_engine("rpart")
 
-bagging_spec <- rand_forest(
-  mode = "regression",
-  mtry = 3,
-  trees = tune()
+final_model <- fit(final_spec,
+                   tournament ~ conference + games + wins + adjoe + adjde + pwrrating + efg_o + efg_d + tor + tord + orb +drb + ftr + ftrd + fg_o + fg_d + threep_o + threep_d + adj_t + wab + year,
+                   data = ncaa)
+final_model %>%
+  predict(new_data = ncaa) %>%
+  bind_cols(ncaa) %>%
+  conf_mat(truth = tournament, estimate = .pred_class) %>%
+  autoplot(type = "heatmap")
+
+
+```
+
+
+
+```{r bagged split}
+set.seed(77)
+ncaa_split <- initial_split(ncaa, prop = 0.5)
+ncaa_train <- training(ncaa_split)
+
+model_spec <- rand_forest(
+  mode = "classification",
+  mtry = 4
 ) %>%
   set_engine("ranger")
 
-grid <- expand.grid(trees =c(100,200,300,400,500))
-bagging_model <- tune_grid(bagging_spec,
-             tournament ~ G + W + ADJOE + ADJDE + BARTHAG + EFG_O + EFG_D + TOR + TORD + ORB + DRB + FTR + FTRD + ADJ_T + WAB,
-             resamples = ncaa_cv,
-             grid = grid
-            )
-```
-
-We create a random forest specification for our model.
-
-```{r fit model}
-final_model <- bagging_model %>%
-  collect_metrics() %>%
-  filter(.metric == "rmse") %>%
-  arrange(mean)
-final_model
+model2 <- fit(model_spec,
+              tournament ~ conference + games + wins + adjoe + adjde + pwrrating + efg_o + efg_d + tor + tord + orb +drb + ftr + ftrd + fg_o + fg_d + threep_o + threep_d + adj_t + wab + year,
+              data = ncaa_train)
+ncaa_test <- testing(ncaa_split)
+model2 %>%
+  predict(new_data = ncaa_test) %>%
+  bind_cols(ncaa_test) %>%
+  conf_mat(truth = tournament, estimate = .pred_class) %>%
+  autoplot(type = "heatmap")
 
 ```
 
-When we fit the model on the data, we see that 400 trees gives us the smallest RMSE. 
 
-To see if we can get a better RMSE, we can try a boosted model. 
-
-```{r boost model}
-set.seed(11)
+```{r boosted}
+set.seed(77)
 boost_spec <- boost_tree(
-  mode = "regression",
+  mode = "classification",
   tree_depth = 1,
-  trees = tune(),
-  learn_rate = 0.1
+  trees = 500,
+  learn_rate = 0.001,
 ) %>%
   set_engine("xgboost")
 
-grid <- expand.grid(trees =c(100,200,300,400,500))
-boost_model <- tune_grid(boost_spec,
-             tournament ~ G + W + ADJOE + ADJDE + BARTHAG + EFG_O + EFG_D + TOR              + TORD + ORB + DRB + FTR + FTRD + ADJ_T + WAB,
-             resamples = ncaa_cv,
-             grid = grid,
-            )
-
-
+model3 <- fit(boost_spec,
+              tournament ~ conference + games + wins + adjoe + adjde + pwrrating + efg_o + efg_d + tor + tord + orb +drb + ftr + ftrd + fg_o + fg_d + threep_o + threep_d + adj_t + wab + year,
+              data = ncaa_train)
+ncaa_test <- testing(ncaa_split)
+model3 %>%
+  predict(new_data = ncaa_test) %>%
+  bind_cols(ncaa_test) %>%
+  conf_mat(truth = tournament, estimate = .pred_class) %>%
+  autoplot(type = "heatmap")
 ```
-
-We create a boosted tree specification and fit the model.
-
-```{r collect metrics boost}
-set.seed(11)
-boost_model_final <- boost_model %>%
-  collect_metrics() %>%
-  filter(.metric == "rmse") %>%
-  arrange(mean)
-boost_model_final
-
-```
-
-We can see that 100 trees gives us the lowest RMSE, but it is still not as efficient as the bagged tree model. 
-
-
-### Evaluation of Model
-
-We can see that a Random Forest model with 400 trees gives us the smallest RMSE for the data. But, considering we were trying to predict a 1 or a 0 from the data, a root mean squared error of .237 is still not very good. 
-
-
-I wanted to predict whether or not a basketball team would make the NCAA tournament based off of their stats from the season. I decided to use a tree-based method because of the simplicity of the interpretation of the model. I first created a random forest model and a boosted tree model, but the random forest had a smaller RMSE, so I chose to use this model with 400 trees. Even though this model had the smallest RMSE of .237, this still was high considering we were only dealing with 1s and 0s. So, I would conclude that we cannot very accurately predict whether or not a team would make the NCAA tournament based on this model. 
 
 
 
