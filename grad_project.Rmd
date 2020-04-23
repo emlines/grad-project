@@ -127,6 +127,37 @@ model3 %>%
   autoplot(type = "heatmap")
 ```
 
+```{r plot packages}
+install.packages("rpart.plot")
+library(rpart.plot)
+
+```
+
+```{r plot}
+
+best <- model %>%
+  select_best(metric = "gain_capture") %>%
+  pull()
+
+final_spec <- decision_tree(
+  cost_complexity = best,
+  tree_depth = 10,
+  mode = "classification"
+) %>%
+  set_engine("rpart")
+
+final_model <- fit(final_spec,
+                   tournament ~ conference + games + wins + adjoe ,
+                   data = ncaa)
+
+rpart.plot(final_model$fit,
+           roundint = FALSE)
+
+```
+
+
+
+
 
 
 
